@@ -1,0 +1,270 @@
+Bebés
+-----
+
+### Obtención y limpieza de los datos
+
+El Marco Geoestadístico Nacional es un sistema único diseñado por el INEGI, para referenciar correctamente la información estadística de los censos y encuestas con los lugares geográficos correspondientes [1](http://www.inegi.org.mx/geo/contenidos/geoestadistica/) . Divide al territorio nacional en áreas con límites identificables en campo, denominadas áreas geoestadísticas, con tres niveles de desagregación: Estatal (AGEE), Municipal (AGEM) y Básica (AGEB), ésta puede ser urbana o rural. A cada área geoestadística se le asigna una clave la cual se construye con una serie ordenada de 9 dígitos [2](http://geoweb.inegi.org.mx/mgn2kData/evidencias/PHC.pdf), los dos primeros corresponden a la clave de la entidad federativa ( AGEM, en el caso de la CdMx ésta clave es 09), seguida de tres dígitos la clave de municipio o delegación ( AGEM, en el caso de la delegación Alvaro Obregon es 010) y concluye con cuatro dígitos indicando la localidad.
+
+En la direccion web <http://www3.inegi.org.mx/sistemas/ageburbana/> se pueden realizar consultas referentes a las claves y del senso de población y vivienda del 2010 en México asociado a las areas geoestadisticas. La consulta que se realiza para obtener los datos con los que se trabaja consiste en seleccionar en el paso 1 ‘Distrito Federal’, seleccionar en el paso 2 las siguientes variables cuya descripción se encuentra en [3](http://www3.inegi.org.mx/sistemas/ageburbana/doc/fd_Agebmza_urbana.pdf):
+
+-   Clave de entidad federativa
+-   Nombre de la entidad
+-   Clave de municipio o delegación
+-   Nombre del municipio o delegación
+-   Clave de localidad
+-   Nombre de la localidad
+-   Clave de la manzana
+-   Población de 0 a 2 años <!-- *Población femenina ---> <!-- ( Población femenina de 12 años y más) --> <!-- ( Promedio de hijos nacidos vivos) -->
+
+Después oprimir el botón ‘’Definir filtro’, en el paso 3 seleccionar la variable ‘Clave de entidad federativa’ luego en el cuadro de texto del paso 4 escribir la clave ‘010’ y oprimir el boton ‘agregar’ seguido del botón ‘consultar’. Para exportar los datos consultados (que reportan información a nivel manzana por localidad) oprimimos en la sección de opciones el botón ‘texto’. Los datos se encuentran en el archivo 'iter2010\_ageb.txt'
+
+El sitio de donde se obtuvieron los datos indica que por cuestiones de confidencialidad algunos valores de la variable ‘Población de 0 a 2 años’ <!-- ’Población femenina’, ‘Población femenina de 12 años y más’ y ‘Promedio de hijos nacidos vivos’ --> no se reportan y en su lugar se presenta el valor '\*', a pesar de que *no es una técnica ideal de imputación de datos*, en vista de que la distribución de valores no reportados por confidencialidad es diferente a lo largo de las AGEB, se omiten esos registros del conjunto de datos inicial.
+
+``` r
+library(dplyr)
+```
+
+    ## 
+    ## Attaching package: 'dplyr'
+
+    ## The following objects are masked from 'package:stats':
+    ## 
+    ##     filter, lag
+
+    ## The following objects are masked from 'package:base':
+    ## 
+    ##     intersect, setdiff, setequal, union
+
+``` r
+library(xtable)
+setwd('/home/fou/Desktop/opi')
+rawdata <- read.csv('iter2010_ageb.txt', na.strings = '*')
+data <- na.omit(rawdata)
+```
+
+### Estimación
+
+A partir de las cifras por manzanas de las áreas geoestadisticas básicas de la población entre 0 a 2 años de edad (variables \(P\_0A2\) de la delegación Álvaro Obregón, se puede estimar la población de los bebés de 0 a 6 meses de la siguiente manera: Agrupando y sumando \(P\_0A2\) por área básica. Suponiendo que la distribución de las personas en este conjunto ( de 0 a 2 años en ese lugar) es uniforme, se divide la suma anterior entre 4.
+
+La estimación anterior acota superiormente al número de bebés que viven en la región debido la población en el rango de edad \[0,2\] descendió en el país desde el 2000 [4](http://www.inegi.org.mx/est/contenidos/proyectos/graficas_temas/piramides/graf/2000.html) al 2010 [5](http://www.inegi.org.mx/est/contenidos/proyectos/graficas_temas/piramides/graf/2010.html) y a que en la CdMx la tasa de fecundidad también ha descendido desde el 2010 ( véase la pág. 19 de [6](http://www.conapo.gob.mx/work/models/CONAPO/Proyecciones/Cuadernos/09_Cuadernillo_DistritoFederal.pdf) )
+
+``` r
+cleanData <- data %>% filter(AGEB != '0000') %>% filter(  MZA != 0) 
+            #%>%mutate(Peques = PROM_HNV * P_12YMAS_F)
+Ageb <- cleanData %>% group_by(ENTIDAD, MUN,  AGEB ) %>% 
+    summarise( P_0A2 = sum(P_0A2))
+a <- Ageb %>% mutate(p1 = (1/4)*P_0A2  )
+est <- data.frame(AGEB = paste0(paste0('0',a$ENTIDAD), paste0('0',a$MUN),
+                                a$AGEB ), Bebes = a$p1 )
+```
+
+\begin{table}[ht]
+\centering
+\caption {Estimación del número de bebés que viven en cada área geoestadística a nivel básico del INEGI en la delegación Álvaro Obregón de la CdMx a la fecha.} 
+\begin{tabular}{lr}
+  \hline
+  AGEB & Bebes \\ 
+  \hline
+ 090100012 & 8.75 \\ 
+   090100027 & 16.00 \\ 
+   090100031 & 33.75 \\ 
+   090100046 & 59.50 \\ 
+   090100050 & 35.00 \\ 
+   090100065 & 53.75 \\ 
+   090100084 & 22.00 \\ 
+   090100099 & 42.50 \\ 
+   090100101 & 3.00 \\ 
+   090100116 & 52.75 \\ 
+   090100135 & 107.00 \\ 
+   09010014A & 44.00 \\ 
+   090100169 & 25.50 \\ 
+   090100173 & 43.25 \\ 
+   090100188 & 4.25 \\ 
+   090100192 & 3.75 \\ 
+   090100205 & 0.00 \\ 
+   09010021A & 0.75 \\ 
+   090100224 & 0.75 \\ 
+   090100239 & 4.75 \\ 
+   090100243 & 84.75 \\ 
+   090100258 & 1.00 \\ 
+   090100262 & 0.00 \\ 
+   090100277 & 2.50 \\ 
+   090100281 & 2.50 \\ 
+   090100296 & 26.00 \\ 
+   090100309 & 31.50 \\ 
+   090100313 & 70.75 \\ 
+   090100328 & 84.50 \\ 
+   090100332 & 47.50 \\ 
+   090100347 & 38.25 \\ 
+   090100351 & 49.00 \\ 
+   090100370 & 37.75 \\ 
+   090100385 & 35.25 \\ 
+   090100417 & 4.00 \\ 
+   090100421 & 65.75 \\ 
+   090100440 & 67.50 \\ 
+   090100455 & 27.25 \\ 
+   090100474 & 114.25 \\ 
+   090100489 & 48.75 \\ 
+   090100493 & 36.75 \\ 
+   090100506 & 40.50 \\ 
+   090100510 & 20.50 \\ 
+   090100525 & 12.25 \\ 
+  09010053A & 46.50 \\ 
+  090100544 & 19.75 \\ 
+  090100559 & 16.50 \\ 
+  090100563 & 102.50 \\ 
+  090100578 & 65.25 \\ 
+  090100597 & 35.25 \\ 
+  09010060A & 24.25 \\ 
+  090100614 & 11.25 \\ 
+  090100629 & 12.50 \\ 
+  090100633 & 13.00 \\ 
+  090100648 & 7.75 \\ 
+  090100667 & 48.00 \\ 
+  090100671 & 15.75 \\ 
+  090100686 & 9.50 \\ 
+  090100690 & 22.75 \\ 
+  090100703 & 11.75 \\ 
+  090100718 & 4.50 \\ 
+  090100722 & 15.50 \\ 
+  090100737 & 0.00 \\ 
+  090100741 & 24.00 \\ 
+  090100756 & 13.25 \\ 
+  090100760 & 5.00 \\ 
+  090100775 & 6.25 \\ 
+  09010078A & 4.25 \\ 
+  090100794 & 1.75 \\ 
+  090100807 & 11.25 \\ 
+   090100811 & 5.25 \\ 
+   090100826 & 4.75 \\ 
+   090100830 & 2.75 \\ 
+   090100845 & 8.25 \\ 
+   090100864 & 61.00 \\ 
+   090100898 & 19.25 \\ 
+   090100900 & 23.50 \\ 
+   090100915 & 12.50 \\ 
+   09010092A & 11.00 \\ 
+   090100949 & 2.25 \\ 
+   090100953 & 7.50 \\ 
+   090100968 & 17.50 \\ 
+   090100972 & 15.75 \\ 
+   090100987 & 5.25 \\ 
+   090100991 & 7.25 \\ 
+   090101006 & 9.75 \\ 
+   090101010 & 13.25 \\ 
+  090101025 & 5.50 \\ 
+  09010103A & 15.25 \\ 
+  090101044 & 18.25 \\ 
+  090101059 & 10.75 \\ 
+  090101063 & 10.25 \\ 
+  090101078 & 53.25 \\ 
+  09010110A & 18.00 \\ 
+  090101114 & 4.25 \\ 
+  090101129 & 7.25 \\ 
+  090101133 & 9.50 \\ 
+  090101148 & 24.50 \\ 
+  090101152 & 6.50 \\ 
+   090101171 & 135.00 \\ 
+   090101186 & 19.75 \\ 
+   090101190 & 12.50 \\ 
+   090101203 & 1.00 \\ 
+   090101218 & 7.50 \\ 
+   090101222 & 21.25 \\ 
+   090101237 & 27.00 \\ 
+   090101241 & 24.50 \\ 
+   090101260 & 9.25 \\ 
+   090101275 & 7.75 \\ 
+   09010128A & 13.25 \\ 
+   090101294 & 10.50 \\ 
+   090101307 & 8.25 \\ 
+   090101330 & 78.50 \\ 
+   090101345 & 84.75 \\ 
+   09010135A & 72.50 \\ 
+   090101364 & 69.25 \\ 
+   090101379 & 6.75 \\ 
+   090101434 & 53.75 \\ 
+   090101453 & 63.25 \\ 
+   090101468 & 32.50 \\ 
+   090101472 & 57.00 \\ 
+   090101487 & 53.25 \\ 
+   090101519 & 46.25 \\ 
+   090101523 & 40.00 \\ 
+   090101542 & 26.25 \\ 
+   090101557 & 70.75 \\ 
+   090101561 & 34.50 \\ 
+   090101580 & 73.75 \\ 
+   090101595 & 67.25 \\ 
+   090101627 & 68.00 \\ 
+  090101631 & 66.75 \\ 
+   090101646 & 61.75 \\ 
+   090101650 & 60.50 \\ 
+   090101665 & 31.25 \\ 
+   09010167A & 79.25 \\ 
+   090101684 & 50.00 \\ 
+   090101699 & 71.00 \\ 
+   090101716 & 90.25 \\
+   090101720 & 33.50 \\ 
+   090101735 & 104.00 \\ 
+   09010174A & 112.25 \\ 
+   090101754 & 38.50 \\ 
+   090101769 & 89.50 \\ 
+   090101773 & 43.75 \\ 
+   090101788 & 45.25 \\ 
+   090101792 & 34.00 \\ 
+   090101805 & 41.75 \\ 
+   09010181A & 60.75 \\ 
+   090101824 & 54.75 \\ 
+   090101839 & 57.75 \\ 
+   090101843 & 80.00 \\ 
+   090101858 & 97.25 \\ 
+   090101881 & 18.25 \\ 
+   090101913 & 34.50 \\ 
+   090101928 & 12.75 \\ 
+   090101932 & 28.75 \\ 
+   090101947 & 41.00 \\ 
+   090101951 & 64.25 \\ 
+   090101966 & 27.75 \\ 
+   090101970 & 44.50 \\ 
+   090101985 & 58.75 \\ 
+   09010199A & 48.50 \\ 
+   090102004 & 0.00 \\ 
+   090102019 & 41.75 \\ 
+   090102023 & 52.25 \\ 
+   090102038 & 45.00 \\ 
+   090102042 & 44.00 \\ 
+   090102057 & 51.00 \\ 
+   090102061 & 85.50 \\ 
+   090102076 & 31.75 \\ 
+   090102080 & 21.50 \\ 
+   090102095 & 58.50 \\ 
+   090102108 & 48.50 \\ 
+   090102112 & 114.00 \\ 
+   090102131 & 9.00 \\ 
+   090102146 & 16.50 \\ 
+   090102150 & 31.75 \\ 
+   090102165 & 38.00 \\ 
+   090102184 & 26.75 \\ 
+   090102199 & 60.75 \\ 
+   090102201 & 33.50 \\ 
+   090102216 & 44.75 \\ 
+   090102220 & 47.00 \\ 
+   090102235 & 50.75 \\ 
+   09010224A & 35.50 \\ 
+   090102254 & 41.50 \\ 
+   090102269 & 19.75 \\ 
+   090102273 & 0.00 \\ 
+   090102288 & 57.25 \\ 
+   090102292 & 44.50 \\ 
+   090102305 & 47.75 \\ 
+   09010231A & 22.25 \\
+   090102324 & 37.75 \\ 
+   090102339 & 30.25 \\ 
+   090102343 & 73.25 \\ 
+   090102358 & 32.00 \\ 
+   090102362 & 19.25 \\ 
+   090102377 & 20.50 \\ 
+   090102381 & 0.75 \\
+   Total & 6981 \\
+   \hline
+\end{tabular}
+\end{table}
