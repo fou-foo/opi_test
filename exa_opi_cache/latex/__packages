@@ -5,3 +5,8 @@ ggplot2
 xtable
 RColorBrewer
 circlize
+jsonlite
+sp
+Matrix
+spdep
+ggmap

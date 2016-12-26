@@ -320,7 +320,7 @@ Figura 4: Relación entre entradas y salidas en todas las estaciones de Ecobici.
 Para mostrar el contraste entre las “rutas” (considerando una estación de salida y una estación de entrada) en la figura 5 se muestran las 30 rutas con mayor afluencia y las 20 rutas con menor afluencia.
 
 
-```{r}
+```{r graphs}
 graph <- eco %>% select(Ciclo_Estacion_Retiro, Ciclo_Estacion_Arribo) %>%
 				arrange(Ciclo_Estacion_Retiro, Ciclo_Estacion_Arribo) %>%
 				group_by(Ciclo_Estacion_Retiro, Ciclo_Estacion_Arribo) %>%
@@ -385,7 +385,41 @@ ggplot(flujo2, aes(Salida,Entrada, colour = factor(labeljerar),
 
 Figura 7: Determinación de conjuntos de estaciones por flujo de viajes en ellos. Grupos obtenidos mediante algoritmo jerárquico.
  
+### Bonus
+
+Finalmente con la información de latitud y longitud de las estaciones, podemos seleccionar las estaciones que son puntos extremos de las 30 rutas con mayor afluencia (las que se muestran en la figura y) en el siguiente mapa se encuentran marcadas de color azul como puntos terminales y el grosor de la línea muestra el conteo de los viajes en ellas en los tres meses. Además sobre el mismo mapa podemos situar las 27 estaciones con mayor número de viajes recibidos ( en vista de que las entradas se correlacionan positivamente con las salidas) y las marcamos de color magenta
+Es de notar que la mayoría de estas estaciones de mayor afluencia son puntos terminales de las rutas de mayor demanda. La información geográfica permite reforzar la idea planteada en la sección de ‘Afluencia de viajes por horarios y estaciones’ de que los usuarios de Ecobici utilizan el servicio para desplazarse a sus trabajos y escuelas, pues las estaciones con mayor flujo se distribuyen a lo largo de la calle de Reforma la cual es una zona con alta número de oficinistas. 
 
 
+```{r}
+library(jsonlite)
 
+a <- fromJSON("estaciones.json", simplifyDataFrame = TRUE)
+estaciones <- a[['stations']][['location']]
+estaciones$id <- a[['stations']][['id']]
+g100 <- graph1
+colnames(g100) <- c("In", "Out", "w")
+p10 <- merge(g100, estaciones, all.x = TRUE, by.x = 'In', by.y = 'id') 
+colnames(p10) <- c("In", "Out", "w", "lat.In", "lon.In")
+p11 <- merge(p10, estaciones, all.x = TRUE, by.x = 'Out', by.y = 'id') 
+colnames(p11) <- c("Out", "In", "viajes", "lat.In", "lon.In", "lat.Out", "lon.Out")
+media <- apply(subset(p10[,c("lat.In", "lon.In")], tipo = 'concurridas') , 2, mean, na.rm =TRUE)
+library(sp)
+library(spdep)
+library(ggmap)
+p1 <- eco %>% group_by(Ciclo_Estacion_Arribo) %>%
+summarise(Incidencias = n()) %>% arrange( desc(Incidencias))
+p1 <- filter(p1, row_number() < 28 )
+colnames(p1) <- c("id", "Incidencias")
+pp1 <- merge(p1, estaciones, all.x =TRUE, by = "id")
+
+mapa <- ggmap(get_map(location = c(  media['lon.In'], media['lat.In']), maptype = "roadmap",
+					 zoom = 14 ) ) + geom_point(data = p10, aes(lon.In, lat.In),  size = 2,
+					 						   colour = "navy" ) +
+		geom_segment(data = p11 ,aes(x = lon.In ,y = lat.In, xend = lon.Out, yend = lat.Out,
+									 alpha = viajes, size = viajes), colour = 'navy' ) +
+		geom_point(data = pp1, aes( x = lon, y = lat,  alpha = Incidencias), colour = "magenta" , 
+			   size = 4 ) 
+mapa
+```
 
