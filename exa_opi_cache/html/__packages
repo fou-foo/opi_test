@@ -1,2 +1,15 @@
 base
 dplyr
+circlize
+lubridate
+ggplot2
+RColorBrewer
+xtable
+knitr
+jsonlite
+sp
+Matrix
+spdep
+ggmap
+leaflet
+geosphere

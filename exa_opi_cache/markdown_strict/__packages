@@ -1,0 +1,14 @@
+base
+knitr
+circlize
+lubridate
+dplyr
+ggplot2
+RColorBrewer
+xtable
+jsonlite
+sp
+Matrix
+spdep
+ggmap
+leaflet

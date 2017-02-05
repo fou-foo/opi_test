@@ -4,10 +4,11 @@ author: "José Antonio García Ramirez"
 date: "December 24, 2016"
 header-includes:
    - \usepackage[spanish]{babel}
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, echo = FALSE}
+library(knitr)
 knitr::opts_chunk$set(echo = TRUE, cache =TRUE, include = TRUE, warning =FALSE)
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   library(grid)
@@ -71,7 +72,6 @@ library(dplyr)
 library(ggplot2)
 library(RColorBrewer)
 library(xtable)
-setwd('/home/fou/Desktop/opi')
 rawdata <- read.csv('iter2010_ageb.txt', na.strings = '*')
 data <- na.omit(rawdata)
 ```
@@ -97,8 +97,10 @@ Ageb <- cleanData %>% group_by(ENTIDAD, MUN,  AGEB ) %>%
 a <- Ageb %>% mutate(p1 = (1/4)*P_0A2  )
 est <- data.frame(AGEB = paste0(paste0('0',a$ENTIDAD), paste0('0',a$MUN),
 								a$AGEB ), Bebes = a$p1 )
+kable(est)
 ```
 
+```{r, eval=FALSE}
 \begin{table}[ht]
 \centering
 \begin{tabular}{rllrllrllrl}
@@ -161,7 +163,7 @@ est <- data.frame(AGEB = paste0(paste0('0',a$ENTIDAD), paste0('0',a$MUN),
 \end{tabular}
 \caption {Estimación del número de bebés que viven en cada área geoestadística a nivel básico del INEGI en la delegación Álvaro Obregón de la CdMx a la fecha.} 
 \end{table}
-
+```
 
 
 
@@ -393,7 +395,6 @@ Es de notar que la mayoría de estas estaciones de mayor afluencia son puntos te
 
 ```{r}
 library(jsonlite)
-
 a <- fromJSON("estaciones.json", simplifyDataFrame = TRUE)
 estaciones <- a[['stations']][['location']]
 estaciones$id <- a[['stations']][['id']]
@@ -412,14 +413,47 @@ summarise(Incidencias = n()) %>% arrange( desc(Incidencias))
 p1 <- filter(p1, row_number() < 28 )
 colnames(p1) <- c("id", "Incidencias")
 pp1 <- merge(p1, estaciones, all.x =TRUE, by = "id")
-
 mapa <- ggmap(get_map(location = c(  media['lon.In'], media['lat.In']), maptype = "roadmap",
-					 zoom = 14 ) ) + geom_point(data = p10, aes(lon.In, lat.In),  size = 2,
+					 zoom = 14 ) )
+```
+
+```{r mapa2}
+mapa <- mapa + geom_point(data = p10, aes(lon.In, lat.In),  size = 2,
 					 						   colour = "navy" ) +
 		geom_segment(data = p11 ,aes(x = lon.In ,y = lat.In, xend = lon.Out, yend = lat.Out,
 									 alpha = viajes, size = viajes), colour = 'navy' ) +
 		geom_point(data = pp1, aes( x = lon, y = lat,  alpha = Incidencias), colour = "magenta" , 
 			   size = 4 ) 
 mapa
+```
+
+```{r mapaextraleaflet}
+library(leaflet)
+library(geosphere)
+names(media) <- c("lat", "lng" )
+ax1 <- p11
+ax2 <- p11
+ax1$Out <- ax1$In <- ax1$viajes <- ax1$lon.Out <- ax1$lat.Out <- NULL
+ax2$Out <- ax2$In <- ax2$viajes <- ax2$lon.In <- ax2$lat.In <- NULL
+names(ax1) <- c( "lat", "lon")
+names(ax2) <- c( "lat", "lon")
+ax11 <- data.frame(lon = ax1$lon, lat = ax1$lat)
+ax12 <- data.frame(lon = ax2$lon, lat = ax2$lat)
+p10$In <- p10$Out <- p10$w <- NULL
+names(p10) <- c("lat", "lng")
+pp1$id <- pp1$Incidencias <- NULL 
+names(pp1) <- c("lat", "lng")
+gcIntermediate(ax11, ax12, n = 30, addStartEnd = TRUE, sp = TRUE) %>% 
+leaflet() %>% setView(lng = media["lng"], lat = media["lat"], zoom = 13) %>%
+    addProviderTiles("MtbMap") %>%
+  addProviderTiles("Stamen.TonerLines",
+    options = providerTileOptions(opacity = 0.35)
+  ) %>%
+  addProviderTiles("Stamen.TonerLabels") %>%
+addCircleMarkers(data = p10, color = c("navy"), stroke = FALSE, fillOpacity = 0.5 ) %>% 
+addCircleMarkers(data = pp1, color = c("green"), stroke = FALSE, fillOpacity = 0.5 ) %>% 
+addTiles() %>% 
+addPolylines()
+
 ```
 
